@@ -54,3 +54,30 @@ The relay is configured on the **Live (Phase)** wire to act as an active gatekee
 ## 🔒 Safety Systems
 * **Isolation Mapping:** High-voltage AC tracks are physically separated from the breadboard's low-voltage DC signals.
 * **Fail-Safe State:** The wire configuration utilizes the **Normally Open (NO)** channel, forcing the high-voltage relay to drop dead into an open, isolated state if the system undergoes a sudden crash, brownout, or total power loss.
+
+---
+
+## 🔍 Troubleshooting & Edge Cases Conquered
+
+During the fabrication and initial testing phases, several distinct hardware and communication bottlenecks were encountered. Below is the debugging matrix and structural edge cases to look out for:
+
+### 1. The Shared Serial Highway Conflict (Upload Failures)
+* **The Symptom:** Attempting to flash updated logic to the microcontroller outputs a compilation failure or connection timeout error: `avrdude: stk500_getsync(): not in sync: resp=0x00`.
+* **The Root Cause:** The Arduino Uno shares its hardware UART lines (Digital Pin 0 and Pin 1) directly with the onboard USB-to-Serial processing chip connected to your PC. Leaving the HC-05 `TXD`/`RXD` lines connected during compilation induces data collision, jamming the programming interface.
+* **The Resolution:** Physically decouple the jumpers from Pins 0 and 1 before hitting the "Upload" command inside the IDE environment. Safely reconnect them only after the status bar returns `Done Uploading`.
+
+### 2. Serial Communication Corruption (The Garbage Buffer Loop)
+* **The Symptom:** Connecting via the terminal application initiates an infinite loop printing unreadable characters or gibberish fragments like `@^` or `⸮⸮⸮`.
+* **The Root Cause:** This is typically a symptom of either crossed data lines or a Baud Rate mismatch between the transceiver arrays. 
+* **The Resolution:** * Verify cross-over wiring topology: Ensure HC-05 `TXD` maps to Arduino `RX (Pin 0)` and HC-05 `RXD` maps to Arduino `TX (Pin 1)`. 
+  * Match system transmission speeds: Ensure the software serial monitoring utility or application layout is configured precisely to **9600 Baud**, matching the initialization value specified in `Serial.begin(9600)`.
+
+### 3. Missing Mechanical Switch-Over (LED Activates, No AC Output)
+* **The Symptom:** Sending the character code `1` illuminates the onboard tracking LED on the relay board, but the module fails to pipe AC power to the secondary wall outlet.
+* **The Root Cause:** The internal mechanical coil demands a sudden peak current draw to throw its electromagnetic rocker. If the logic isolation jumper block (the physical plastic shunt capping `JD-VCC` and `VCC`) is missing or loose, the coil lines drop completely dead, leaving the high-voltage relay stranded in an open circuit.
+* **The Resolution:** Ensure the physical copper/plastic logic shunt remains seated snugly over the `JD-VCC` and `VCC` pin array to correctly tap power from the Arduino’s main 5V rail.
+
+### 4. Direct Terminal Crossover Misalignment (The Left-to-Right Mixup)
+* **The Symptom:** The code flashes cleanly, the Bluetooth handshake succeeds, and the relay physically clicks, yet the appliance connected down the loop completely ignores commands.
+* **The Root Cause:** Passing the structural AC line through the wrong output terminal hole (e.g., screwing your load wire into the `NC` block instead of the `NO` block). On specific production module variants (such as the Robodo series), explicit text labels like `COM` and `NO` are omitted for raw channel markers (`K1` / `K2`).
+* **The Resolution:** Keeping the terminal block array facing towards you, precisely conform to the high-voltage index: Left Hole = `NO` (Connect to Socket Input), Middle Hole = `COM` (Connect to Switch Line), Right Hole = `NC` (Leave open).
